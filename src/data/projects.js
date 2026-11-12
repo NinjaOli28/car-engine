@@ -1,0 +1,116 @@
+import { litres, nm, bar } from './vehicles.js';
+
+/** Replace {tokens} in step text with this vehicle's service figures. */
+export function fill(text, v) {
+  const s = v.specs;
+  const map = { ...s, oilL: litres(s.oilQt), drainNm: nm(s.drainTorque), plugNm: nm(s.plugTorque), lugNm: nm(s.lugTorque), barF: bar(s.psiF), barR: bar(s.psiR),
+    cyl: v.engine.layout === 'V6' ? 'six' : 'four', name: `${v.make} ${v.model}`, engine: v.engine.label };
+  return text.replace(/\{(\w+)\}/g, (_, k) => (map[k] !== undefined ? map[k] : `{${k}}`));
+}
+
+const V = { top: { yaw: 0.25, pitch: 0.85, k: 3.2 }, front: { yaw: 0.0, pitch: 0.55, k: 3.4 }, under: { yaw: 0.5, pitch: -0.35, k: 4 }, side: { yaw: 1.2, pitch: 0.12, k: 3.2 }, close: { yaw: 0.4, pitch: 0.7, k: 3.3 } };
+
+// step: t title, d detail, part to focus, view, do: scripted actions, warn: safety note
+export const PROJECTS = [
+  { id: 'oil', title: 'Change engine oil & filter', level: 'Beginner', mins: 45, icon: 'oil',
+    blurb: 'The most valuable job you can learn. Fresh oil protects every moving part inside the engine.',
+    tools: ['Socket set & ratchet', 'Oil filter wrench', 'Drain pan (6 L+)', 'Funnel', 'Torque wrench', 'Gloves & rags'],
+    supplies: ['{oilQt} qt ({oilL} L) of {oilType}', 'New oil filter ({filter})', 'New drain-plug washer'],
+    steps: [
+      { t: 'Warm the engine, then park safely', d: 'Run the engine for two or three minutes so the oil flows easily, then switch off. Park on level ground, apply the parking brake and let the exhaust cool.', part: 'body', view: { yaw: 0.8, pitch: 0.25, k: 1.6 }, warn: 'Hot oil burns. Wear gloves and eye protection.' },
+      { t: 'Open the hood and remove the filler cap', d: 'Release the hood and prop it open. Unscrew the oil filler cap on the valve cover. This lets air in so the oil drains faster.', part: 'oil_cap', view: V.top, do: [['hood', 1], ['pull', 'oil_cap', 1]] },
+      { t: 'Raise and support the vehicle', d: 'Lift the car on a hoist, or use ramps or a jack with axle stands under the marked lifting points.', part: 'oil_pan', view: V.under, do: [['lift', 1]], warn: 'Never get under a car supported only by a jack.' },
+      { t: 'Drain the old oil', d: 'Slide the drain pan under the sump. Loosen the drain plug with a socket, then spin it out by hand and pull it away quickly. Let the oil drain until it slows to a drip.', part: 'drain_plug', view: { yaw: 2.4, pitch: -0.3, k: 9 }, do: [['lift', 1], ['pull', 'drain_plug', 1], ['drain']] },
+      { t: 'Remove the old oil filter', d: 'Move the pan under the filter. Unscrew the filter anticlockwise with the filter wrench. Check the old rubber seal came away with it.', part: 'oil_filter', view: { yaw: 0.3, pitch: -0.35, k: 7 }, do: [['lift', 1], ['pull', 'oil_filter', 1]] },
+      { t: 'Fit the new filter', d: 'Smear clean oil on the new filter\'s rubber seal. Screw it on by hand until the seal touches, then tighten another three-quarters of a turn. Do not use the wrench.', part: 'oil_filter', view: { yaw: 0.3, pitch: -0.35, k: 7 }, do: [['pull', 'oil_filter', 0]] },
+      { t: 'Refit the drain plug', d: 'Wipe the plug and fit a new sealing washer. Start it by hand, then torque to {drainTorque} lb-ft ({drainNm} N·m).', part: 'drain_plug', view: { yaw: 2.4, pitch: -0.3, k: 9 }, do: [['pull', 'drain_plug', 0], ['hidefx']], warn: 'Over-tightening strips the threads in the oil pan.' },
+      { t: 'Lower the vehicle', d: 'Clear tools and the drain pan from underneath, then lower the car to the ground.', part: 'body', view: { yaw: 0.6, pitch: 0.3, k: 1.5 }, do: [['lift', 0]] },
+      { t: 'Add new oil', d: 'Using a funnel, pour in {oilQt} quarts ({oilL} litres) of {oilType}. Refit the filler cap firmly.', part: 'oil_cap', view: V.top, do: [['hood', 1], ['pull', 'oil_cap', 1], ['pour'], ['pull', 'oil_cap', 0]] },
+      { t: 'Check the level on the dipstick', d: 'Wait a minute. Pull the dipstick, wipe it, push it fully home and pull it again. The oil should sit between the two marks, near the top one.', part: 'dipstick', view: V.close, do: [['pull', 'dipstick', 1], ['wait', 1.6], ['pull', 'dipstick', 0]] },
+      { t: 'Run the engine and check for leaks', d: 'Start the engine. The oil warning lamp should go out within seconds. Look underneath for drips at the plug and filter, re-check the level, and reset the service reminder.', part: 'oil_filter', view: V.front, do: [['hood', 0]], warn: 'Take the old oil and filter to a recycling centre. Never pour oil down a drain.' },
+    ] },
+  { id: 'plugs', title: 'Replace spark plugs', level: 'Intermediate', mins: 60, icon: 'spark',
+    blurb: 'New plugs restore smooth running and fuel economy. This engine has {cyl} of them.',
+    tools: ['Spark plug socket with extension', 'Torque wrench', 'Gap gauge', '10 mm socket', 'Dielectric grease'],
+    supplies: ['{cyl} new plugs ({plug})'],
+    steps: [
+      { t: 'Let the engine cool completely', d: 'Aluminium cylinder-head threads are easily damaged when hot. Work on a cold engine and open the hood.', part: 'valve_cover', view: V.top, do: [['hood', 1]], warn: 'Never remove spark plugs from a hot engine.' },
+      { t: 'Unplug and remove the ignition coils', d: 'Press the tab on each electrical connector and pull it off. Undo the retaining bolt, then twist and pull each coil straight up. Keep them in order.', part: 'coil_1', view: V.close, do: [['hood', 1], ['pullAll', 'coil', 1]] },
+      { t: 'Clean around the plug wells', d: 'Blow out any dirt with compressed air so nothing falls into the cylinder when the plug comes out.', part: 'valve_cover', view: V.close },
+      { t: 'Remove the old plugs', d: 'Fit the plug socket and extension squarely. Turn anticlockwise. If a plug feels tight, stop, add penetrating oil and work it gently back and forth.', part: 'plug_1', view: V.close, do: [['pullAll', 'coil', 1], ['pullAll', 'plug', 1]] },
+      { t: 'Read the old plugs', d: 'A light tan or grey tip is healthy. Black soot suggests a rich mixture, wet oil suggests worn rings or valve seals, and white blistering points to overheating.', part: 'plug_2', view: { yaw: 0.4, pitch: 0.4, k: 8 } },
+      { t: 'Check the gap on the new plugs', d: 'Measure each new plug with a gap gauge. The specification is {plugGap} millimetres. Do not bend the electrode on iridium plugs. Exchange any that are wrong.', part: 'plug_1', view: { yaw: 0.4, pitch: 0.4, k: 8 } },
+      { t: 'Install the new plugs', d: 'Thread each plug in by hand for the first few turns so it cannot cross-thread. Then torque to {plugTorque} lb-ft ({plugNm} N·m).', part: 'plug_1', view: V.close, do: [['pullAll', 'plug', 0]], warn: 'If it will not turn easily by hand, back it out and start again.' },
+      { t: 'Refit the coils', d: 'Put a small dab of dielectric grease inside each coil boot. Push each coil down until it seats, refit the bolt and click the connector on.', part: 'coil_1', view: V.close, do: [['pullAll', 'coil', 0]] },
+      { t: 'Start and test', d: 'Start the engine. It should idle smoothly with no warning light. A misfire usually means a connector is not fully clicked home.', part: 'valve_cover', view: V.top, do: [['hood', 0]] },
+    ] },
+  { id: 'airfilter', title: 'Replace engine air filter', level: 'Beginner', mins: 10, icon: 'air',
+    blurb: 'A five-minute job that needs no tools on most cars.',
+    tools: ['Screwdriver (some models)', 'Vacuum or rag'], supplies: ['New engine air filter'],
+    steps: [
+      { t: 'Locate the air box', d: 'Open the hood. The air box is the black plastic housing connected to the engine by a large duct.', part: 'airbox_lid', view: V.top, do: [['hood', 1]] },
+      { t: 'Release the lid', d: 'Unclip the spring clips or undo the screws, then lift the lid. You may need to loosen the duct clamp to move it far enough.', part: 'airbox_lid', view: V.close, do: [['hood', 1], ['pull', 'intake_duct', 1], ['pull', 'airbox_lid', 1]] },
+      { t: 'Lift out the old filter', d: 'Note which way up it sits. Hold it to the light. If you cannot see light through the pleats, it is finished.', part: 'air_filter', view: V.close, do: [['pull', 'airbox_lid', 1], ['pull', 'air_filter', 1]] },
+      { t: 'Clean the housing', d: 'Wipe or vacuum leaves and grit from the bottom of the box. Do not let debris fall into the clean side of the intake.', part: 'airbox', view: V.close },
+      { t: 'Fit the new filter', d: 'Seat the new filter with the rubber seal flat all the way round, the same way up as the old one.', part: 'air_filter', view: V.close, do: [['pull', 'air_filter', 0]] },
+      { t: 'Close the lid', d: 'Refit the lid, making sure its tabs are located, then fasten every clip. Reconnect the duct and close the hood.', part: 'airbox_lid', view: V.top, do: [['pull', 'airbox_lid', 0], ['pull', 'intake_duct', 0], ['wait', 0.8], ['hood', 0]] },
+    ] },
+  { id: 'battery', title: 'Replace the battery', level: 'Beginner', mins: 20, icon: 'battery',
+    blurb: 'Disconnect in the right order and this is a safe, simple swap.',
+    tools: ['10 mm spanner', 'Terminal brush', 'Gloves & eye protection'], supplies: ['New battery ({battery})', 'Terminal protector spray'],
+    steps: [
+      { t: 'Switch everything off', d: 'Turn off the ignition and remove the key. Open the hood and find the battery.', part: 'battery', view: V.top, do: [['hood', 1]], warn: 'Batteries contain acid and can give off explosive gas. No sparks or flames.' },
+      { t: 'Disconnect the negative terminal first', d: 'Loosen the nut on the black negative clamp and lift it off the post. Tuck the cable aside so it cannot spring back.', part: 'battery_neg', view: V.close, do: [['hood', 1], ['pull', 'battery_neg', 1]], warn: 'Negative first. If the spanner then touches the body while on the positive post, nothing happens.' },
+      { t: 'Disconnect the positive terminal', d: 'Flip up the red cover, loosen the clamp and lift it off.', part: 'battery_pos', view: V.close, do: [['pull', 'battery_neg', 1], ['pull', 'battery_pos', 1]] },
+      { t: 'Remove the hold-down', d: 'Undo the bracket that clamps the battery to its tray.', part: 'battery_clamp', view: V.close, do: [['pull', 'battery_clamp', 1]] },
+      { t: 'Lift the battery out', d: 'Lift straight up using the handle. It weighs 15 to 20 kilograms, so bend your knees and keep it upright.', part: 'battery', view: V.close, do: [['pull', 'battery_clamp', 1], ['pull', 'battery_neg', 1], ['pull', 'battery_pos', 1], ['pull', 'battery', 1]] },
+      { t: 'Clean the tray and clamps', d: 'Brush any white or green corrosion off the cable clamps and wipe the tray.', part: 'battery_pos', view: V.close },
+      { t: 'Fit the new battery', d: 'Lower the new battery in with the posts the same way round, then refit and tighten the hold-down. It must not move.', part: 'battery', view: V.close, do: [['pull', 'battery', 0], ['wait', 0.9], ['pull', 'battery_clamp', 0]] },
+      { t: 'Connect positive first, then negative', d: 'Fit and tighten the red positive clamp, then the black negative clamp. Neither should twist by hand. Spray with terminal protector.', part: 'battery_pos', view: V.close, do: [['pull', 'battery_pos', 0], ['wait', 0.9], ['pull', 'battery_neg', 0]] },
+      { t: 'Start and reset', d: 'Start the engine. Reset the clock and any one-touch windows. Return the old battery for recycling.', part: 'battery', view: V.top, do: [['hood', 0]] },
+    ] },
+  { id: 'fluids', title: 'Check & top up fluids', level: 'Beginner', mins: 10, icon: 'drop',
+    blurb: 'A monthly five-point check that prevents most breakdowns.',
+    tools: ['Clean rag', 'Funnel'], supplies: ['{oilType}', 'Coolant: {coolant}', 'DOT brake fluid as marked on the cap', 'Washer fluid'],
+    steps: [
+      { t: 'Park level with a cold engine', d: 'Fluid levels are only accurate on level ground. Open the hood.', part: 'hood', view: V.front, do: [['hood', 1]] },
+      { t: 'Engine oil', d: 'Pull the dipstick, wipe it, reinsert it fully and pull it again. The level should be between the marks. Top up through the filler cap a little at a time.', part: 'dipstick', view: V.close, do: [['hood', 1], ['pull', 'dipstick', 1], ['wait', 1.6], ['pull', 'dipstick', 0]] },
+      { t: 'Coolant', d: 'Look at the side of the expansion tank. The level should be between MIN and MAX. Top up with {coolant} coolant.', part: 'coolant_res', view: V.close, warn: 'Never open the coolant cap on a hot engine.' },
+      { t: 'Brake fluid', d: 'Check the level against the marks on the reservoir. If it is near MIN, have the pads and system checked rather than simply topping up.', part: 'brake_res', view: V.close },
+      { t: 'Washer fluid', d: 'Open the blue cap and fill to the neck with washer fluid.', part: 'washer_res', view: V.close },
+      { t: 'Belts and hoses', d: 'While you are here, look along the drive belt for cracks and squeeze the radiator hoses. Then close the hood.', part: 'belt', view: V.close, do: [['wait', 1.5], ['hood', 0]] },
+    ] },
+  { id: 'tyres', title: 'Check tyre pressure & tread', level: 'Beginner', mins: 10, icon: 'tyre',
+    blurb: 'Correct pressures improve braking, grip, fuel use and tyre life.',
+    tools: ['Tyre pressure gauge', 'Tread depth gauge', 'Air compressor'], supplies: [],
+    steps: [
+      { t: 'Find the correct pressures', d: 'Read the placard in the driver\'s door jamb. For this {name}: front {psiF} psi ({barF} bar), rear {psiR} psi ({barR} bar).', part: 'body', view: { yaw: 1.3, pitch: 0.15, k: 1.4 }, warn: 'The number on the tyre sidewall is the tyre\'s maximum, not the pressure to use.' },
+      { t: 'Measure cold', d: 'Check before driving, or after the car has stood for three hours. Remove the valve cap, press the gauge on squarely and read it.', part: 'wheel_fl', view: { yaw: -1.3, pitch: 0.1, k: 3.4 } },
+      { t: 'Adjust the pressure', d: 'Add air in short bursts and re-measure. To release air, press the pin in the centre of the valve. Refit the cap.', part: 'wheel_fl', view: { yaw: -1.3, pitch: 0.1, k: 3.4 } },
+      { t: 'Measure tread depth', d: 'Put the depth gauge in a main groove at the inside, centre and outside. The legal minimum is 1.6 millimetres in most countries. Plan to replace at 3 millimetres.', part: 'wheel_fr', view: { yaw: 0.9, pitch: 0.15, k: 3.4 } },
+      { t: 'Inspect the sidewalls', d: 'Look for cuts, cracks, bulges and embedded objects. A bulge means the tyre structure has failed and it must be replaced now.', part: 'wheel_rr', view: { yaw: 1.9, pitch: 0.1, k: 3.4 } },
+      { t: 'Repeat on every wheel, and the spare', d: 'Check all four tyres and the spare. Uneven wear across a tyre points to wrong pressure or alignment.', part: 'wheel_rl', view: { yaw: -1.9, pitch: 0.1, k: 3.4 } },
+    ] },
+  { id: 'wheel', title: 'Change a wheel', level: 'Beginner', mins: 25, icon: 'wheel',
+    blurb: 'Know this before you need it at the roadside.',
+    tools: ['Jack', 'Wheel brace', 'Wheel chocks', 'Torque wrench'], supplies: ['Spare wheel, correctly inflated'],
+    steps: [
+      { t: 'Make the car safe', d: 'Stop on firm, level ground away from traffic. Hazard lights on, parking brake on, first gear or Park. Chock the wheel diagonally opposite.', part: 'wheel_fl', view: { yaw: -1.1, pitch: 0.15, k: 2.6 } },
+      { t: 'Crack the nuts loose', d: 'With the wheel still on the ground, turn each nut anticlockwise by half a turn. Do not remove them yet.', part: 'lugs_fl', view: { yaw: -1.45, pitch: 0.05, k: 9 } },
+      { t: 'Raise the car', d: 'Place the jack under the lifting point marked on the sill and raise until the tyre is clear of the ground. In the workshop we use the lift.', part: 'wheel_fl', view: { yaw: -1.1, pitch: 0.05, k: 2.6 }, do: [['lift', 1]], warn: 'Never put any part of your body under a car on a jack.' },
+      { t: 'Remove the nuts and wheel', d: 'Undo the nuts fully and keep them together. Pull the wheel straight towards you and lay it flat.', part: 'wheel_fl', view: { yaw: -1.0, pitch: 0.1, k: 2.2 }, do: [['lift', 1], ['pull', 'lugs_fl', 1], ['wait', 0.4], ['pull', 'wheel_fl', 1]] },
+      { t: 'Inspect the brake while you are here', d: 'With the wheel off you can see the disc, caliper and pads. Check pad thickness and look for scoring or fluid leaks.', part: 'pads_fl', view: { yaw: -1.2, pitch: 0.1, k: 5 } },
+      { t: 'Fit the spare', d: 'Line the holes up with the studs and push the wheel fully home. Spin every nut on by hand.', part: 'wheel_fl', view: { yaw: -1.0, pitch: 0.1, k: 2.4 }, do: [['pull', 'wheel_fl', 0], ['wait', 0.9], ['pull', 'lugs_fl', 0]] },
+      { t: 'Snug the nuts in a star pattern', d: 'Tighten each nut lightly, moving across the wheel in a star pattern so it seats evenly.', part: 'lugs_fl', view: { yaw: -1.45, pitch: 0.05, k: 9 } },
+      { t: 'Lower and torque', d: 'Lower the car until the tyre takes the weight. Torque each nut in the star pattern to {lugTorque} lb-ft ({lugNm} N·m).', part: 'lugs_fl', view: { yaw: -1.1, pitch: 0.15, k: 2.6 }, do: [['lift', 0]] },
+      { t: 'Finish up', d: 'Check the spare\'s pressure, stow the tools, and re-check the nut torque after 50 kilometres. Space-saver spares are limited to 80 km/h.', part: 'wheel_fl', view: { yaw: -1.1, pitch: 0.15, k: 2.6 } },
+    ] },
+  { id: 'wipers', title: 'Replace wiper blades', level: 'Beginner', mins: 10, icon: 'wiper',
+    blurb: 'Clear vision in two minutes per side.', tools: [], supplies: ['Driver blade {wiperD} in', 'Passenger blade {wiperP} in'],
+    steps: [
+      { t: 'Lift the wiper arm', d: 'Raise the arm away from the glass until it locks upright. Lay a towel on the windshield in case the arm snaps back.', part: 'wipers', view: { yaw: 0.2, pitch: 0.5, k: 2.6 }, warn: 'A bare metal arm snapping down can crack the windshield.' },
+      { t: 'Release the old blade', d: 'Find the small tab where the blade meets the arm. Press it and slide the blade down and off the hook.', part: 'wipers', view: { yaw: 0.2, pitch: 0.5, k: 3 }, do: [['pull', 'wipers', 1]] },
+      { t: 'Fit the new blade', d: 'Slide the new blade into the hook until it clicks. Tug it to confirm it is locked. Driver side is {wiperD} inches, passenger side {wiperP} inches.', part: 'wipers', view: { yaw: 0.2, pitch: 0.5, k: 3 }, do: [['pull', 'wipers', 0]] },
+      { t: 'Lower and test', d: 'Lower each arm gently onto the glass. Wet the windshield and run the wipers. They should clear in one pass with no streaks or judder.', part: 'windshield', view: { yaw: 0.3, pitch: 0.35, k: 1.8 } },
+    ] },
+];
