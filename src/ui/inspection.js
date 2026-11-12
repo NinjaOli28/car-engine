@@ -149,8 +149,9 @@ export const inspection = {
     else if (act === 'review') this.review(app);
     else if (act === 'closeModal') app.closeModal();
     else if (act === 'submit') this.submit(app);
-    else if (act === 'print') window.print();
+    else if (act === 'print') { try { window.print(); } catch { app.toast('Printing is not available here'); } }
     else if (act === 'again') { app.closeModal(); this.intro(app); }
-    else if (act === 'abandon') { if (confirm('Abandon this inspection? Your grades will be lost.')) { clearInterval(timer); sess = null; app.veh.reset(); ['coolant', 'washer', 'brake'].forEach((k) => app.veh.setFluid(k, 0.8)); app.home(); this.intro(app); } }
+    else if (act === 'abandon') app.modal(`<h2>Abandon this inspection?</h2><p class="muted">Your grades so far will be lost.</p><div class="row end"><button class="btn" data-act="closeModal">Keep inspecting</button><button class="btn primary" data-act="abandonYes">Abandon</button></div>`);
+    else if (act === 'abandonYes') { app.closeModal(); clearInterval(timer); sess = null; app.veh.reset(); ['coolant', 'washer', 'brake'].forEach((k) => app.veh.setFluid(k, 0.8)); app.home(); this.intro(app); }
   },
 };
